@@ -1,0 +1,2 @@
+- [Examples](./examples.md)
+  - [Nested](./nested/adjacent.md)

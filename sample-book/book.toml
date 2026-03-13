@@ -1,0 +1,8 @@
+[book]
+authors = ["Example Author"]
+
+[build]
+extra-watch-dirs = ["../src/"]
+
+[preprocessor.preprocessor]
+command = "cargo run"
