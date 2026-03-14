@@ -1,24 +1,21 @@
 mod crossref;
-mod rewrites;
+mod rewrite;
 mod typst;
 
 use std::{
-    collections::HashMap,
     io::{Read, Write},
     ops::Range,
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
-use mdbook_preprocessor::book::{Book, BookItem, Chapter, SectionNumber};
+use indexmap::IndexMap;
+use mdbook_preprocessor::book::{Book, BookItem, Chapter};
 use pulldown_cmark::{
     CowStr, Event, HeadingLevel, LinkType, Parser, Tag, TagEnd, TextMergeWithOffset,
 };
 
-use crate::{
-    crossref::Autolink,
-    rewrites::{Rewrite, Rewrites},
-};
+use crate::rewrite::{Rewrite, Rewrites};
 
 fn main() -> Result<()> {
     let command = std::env::args().skip(1).next();
@@ -102,32 +99,50 @@ struct CodeBlock<'a> {
 }
 
 #[derive(Debug, Clone)]
+pub struct Autolink<'a> {
+    url: CowStr<'a>,
+    pub full_range: Range<usize>,
+}
+
+impl<'a> Autolink<'a> {
+    pub fn new(url: CowStr<'a>, range: Range<usize>) -> Self {
+        Self {
+            url,
+            full_range: range,
+        }
+    }
+
+    pub fn protocol(&self) -> &str {
+        self.url.split_once(':').unwrap_or_default().0
+    }
+
+    pub fn value(&self) -> &str {
+        self.url.split_once(':').unwrap_or_default().1
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Heading<'a> {
+    level: usize,
+    source: Option<(HeadingLevel, Range<usize>)>,
+    text: &'a str,
+}
+
+impl Heading<'_> {
+    pub fn level(&self) -> usize {
+        self.level
+    }
+}
+
+#[derive(Debug, Clone)]
 enum Element<'a> {
     CodeBlock(CodeBlock<'a>),
     AutolinkedHeading {
-        containing_section: SectionNumber,
-        level: HeadingLevel,
-        text: &'a str,
-        heading_no_link_range: Range<usize>,
+        heading: Heading<'a>,
         link: Autolink<'a>,
     },
+    Heading(Heading<'a>),
     Autolink(Autolink<'a>),
-}
-
-struct Link<'a> {
-    path: &'a Path,
-    anchor: &'a str,
-    supplement: String,
-}
-
-impl Link<'_> {
-    pub fn url(&self) -> String {
-        format!(
-            "/{path}#{anchor}",
-            path = self.path.display(),
-            anchor = self.anchor
-        )
-    }
 }
 
 struct Rewriter {
@@ -152,10 +167,10 @@ impl Rewriter {
     }
 
     fn rewrite_book(&self, book: &mut Book) -> Result<()> {
-        let mut map = HashMap::new();
+        let mut map = IndexMap::new();
         let mut rewrites = Default::default();
 
-        extract_items_recursively(&book.items, &mut map);
+        extract_elements_recursively(&book.items, &mut map);
 
         self.create_typst_rewrites(&map, &mut rewrites)?;
         self.create_crossref_rewrites(&map, &mut rewrites)?;
@@ -165,103 +180,9 @@ impl Rewriter {
         Ok(())
     }
 
-    fn create_crossref_rewrites(
-        &self,
-        map: &HashMap<PathBuf, Vec<Element>>,
-        rewrites: &mut Rewrites,
-    ) -> Result<()> {
-        let mut known_links = HashMap::new();
-
-        for (md_path, elements) in map {
-            let rewrites = rewrites.at(md_path.clone());
-            for element in elements {
-                match element {
-                    Element::AutolinkedHeading {
-                        containing_section,
-                        level,
-                        link,
-                        heading_no_link_range,
-                        text,
-                    } => {
-                        if link.protocol() != "label" {
-                            continue;
-                        }
-
-                        let label_name = link.value();
-
-                        let number = containing_section.to_string();
-                        // Containing section is formatted with trailing dot
-                        let number = &number[..number.len() - 1];
-                        let supplement = format!("Section {number}");
-
-                        known_links.insert(
-                            label_name,
-                            Link {
-                                path: md_path.as_ref(),
-                                anchor: label_name,
-                                supplement,
-                            },
-                        );
-
-                        // Replace with mdbook-native ID format
-                        rewrites.push(Rewrite {
-                            range: link.full_range.clone(),
-                            replacement: format!("{{ #{label_name} }}"),
-                        });
-
-                        let prefix: String = std::iter::repeat_n('#', *level as usize).collect();
-
-                        let numbering = format!("{}1", containing_section);
-                        let replacement = format!("{prefix} {numbering} {text}");
-
-                        rewrites.push(Rewrite {
-                            range: heading_no_link_range.clone(),
-                            replacement,
-                        })
-                    }
-                    _ => continue,
-                };
-            }
-        }
-
-        for (md_path, elements) in map {
-            let rewrites = rewrites.at(md_path.clone());
-            for element in elements {
-                let rewrite = match element {
-                    Element::Autolink(autolink) => {
-                        if autolink.protocol() != "ref" {
-                            continue;
-                        }
-
-                        let Some(link) = known_links.get(autolink.value()) else {
-                            eprintln!("Unknown reference `{}`", autolink.value());
-                            continue;
-                        };
-
-                        let link_resolved = format!(
-                            "[{supp}]({link})",
-                            supp = link.supplement,
-                            link = link.url(),
-                        );
-
-                        Rewrite {
-                            range: autolink.full_range.clone(),
-                            replacement: link_resolved,
-                        }
-                    }
-                    _ => continue,
-                };
-
-                rewrites.push(rewrite);
-            }
-        }
-
-        Ok(())
-    }
-
     fn create_typst_rewrites(
         &self,
-        map: &HashMap<PathBuf, Vec<Element>>,
+        map: &IndexMap<PathBuf, Vec<Element>>,
         rewrites: &mut Rewrites,
     ) -> Result<()> {
         for (md_path, elements) in map {
@@ -310,9 +231,13 @@ impl Rewriter {
     }
 }
 
-fn extract_items_recursively<'a>(
+/// Extract elements recursively.
+///
+/// `map` will contain the paths to included
+/// chapthers in summary order.
+fn extract_elements_recursively<'a>(
     items: &'a Vec<BookItem>,
-    map: &mut HashMap<PathBuf, Vec<Element<'a>>>,
+    map: &mut IndexMap<PathBuf, Vec<Element<'a>>>,
 ) {
     let chapters = items.iter().filter_map(|i| match i {
         BookItem::Chapter(c) => Some(c),
@@ -324,15 +249,20 @@ fn extract_items_recursively<'a>(
             continue;
         };
 
-        let items = extract_elements(&chapter);
+        let mut items = vec![Element::Heading(Heading {
+            level: chapter.number.as_ref().unwrap().len(),
+            text: &chapter.name,
+            source: None,
+        })];
+
+        extract_elements(&chapter, &mut items);
         map.insert(path, items);
 
-        extract_items_recursively(&chapter.sub_items, map);
+        extract_elements_recursively(&chapter.sub_items, map);
     }
 }
 
-fn extract_elements(chapter: &Chapter) -> Vec<Element<'_>> {
-    let mut elements = Vec::new();
+fn extract_elements<'a>(chapter: &'a Chapter, elements: &mut Vec<Element<'a>>) {
     let content = &chapter.content;
     let parser = Parser::new(&content).into_offset_iter();
     let mut parser = TextMergeWithOffset::new(parser);
@@ -394,29 +324,42 @@ fn extract_elements(chapter: &Chapter) -> Vec<Element<'_>> {
                 };
 
                 if let Some((dest_url, link_range)) = auto_link_label {
-                    let heading_text_range = range.start..link_range.start;
+                    let heading_no_link_range = range.start..link_range.start;
                     let text_data = text_start.unwrap()..link_range.start;
 
-                    elements.push(Element::AutolinkedHeading {
-                        containing_section: chapter.number.clone().unwrap(),
-                        level,
-                        link: Autolink::new(dest_url, link_range),
-                        heading_no_link_range: heading_text_range,
+                    let heading = Heading {
+                        level: chapter.number.as_ref().unwrap().len() + level as usize,
                         text: &content[text_data],
+                        source: Some((level, heading_no_link_range)),
+                    };
+
+                    elements.push(Element::AutolinkedHeading {
+                        heading,
+                        link: Autolink::new(dest_url, link_range),
                     });
+                } else {
+                    let text_data = text_start.unwrap()..range.end;
+
+                    let heading = Heading {
+                        level: chapter.number.as_ref().unwrap().len() + level as usize,
+                        text: &content[text_data],
+                        source: Some((level, range)),
+                    };
+
+                    elements.push(Element::Heading(heading));
                 }
             }
             Event::Start(Tag::Link {
                 link_type: LinkType::Autolink,
                 dest_url,
+                title,
                 ..
             }) => {
+                eprintln!("{title:?}");
                 elements.push(Element::Autolink(Autolink::new(dest_url, range)))
                 // Could handle `Event::End(TagEnd::Link)`, but not necessary
             }
             _ => {}
         }
     }
-
-    elements
 }

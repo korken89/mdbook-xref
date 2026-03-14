@@ -1,2 +1,4 @@
 - [Examples](./examples.md)
-  - [Nested](./nested/adjacent.md)
+  <!-- - [Second adjacent](./nested/second_adjacent.md)
+  - [Adjacent](./nested/adjacent.md)
+- [Second Chapter](./second_chapter.md) -->
