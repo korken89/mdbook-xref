@@ -14,25 +14,10 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-enum Supplement {
-    Figure(usize),
-    Custom(String),
-}
-
-impl std::fmt::Display for Supplement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Supplement::Figure(_) => todo!(),
-            Supplement::Custom(v) => f.write_str(v),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
 struct Crossref<'a> {
     path: &'a Path,
     anchor: &'a str,
-    supplement: Option<Supplement>,
+    supplement: Option<String>,
 }
 
 impl<'a> Crossref<'a> {
@@ -65,7 +50,7 @@ impl Rewriter {
                         let id = link.url.value();
 
                         let supplement = if !link.title.is_empty() {
-                            Some(Supplement::Custom(link.title.to_string()))
+                            Some(link.title.to_string())
                         } else {
                             None
                         };
