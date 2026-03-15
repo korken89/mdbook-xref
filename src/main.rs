@@ -4,15 +4,27 @@ mod rewrite;
 
 use std::io::{Read, Write};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use indexmap::IndexMap;
 use mdbook_preprocessor::book::{Book, BookItem, Chapter};
 
 fn main() -> Result<()> {
-    let command = std::env::args().skip(1).next();
+    let args: Vec<_> = std::env::args().skip(1).collect();
+
+    let command = args.get(0);
 
     let output = match command.as_ref().map(|v| v.as_str()) {
-        Some("supports") => "".to_string(),
+        Some("supports") => {
+            let backend = args
+                .get(1)
+                .context("missing 2nd argument specifying backend")?;
+
+            return if backend == "html" {
+                Ok(())
+            } else {
+                Err(anyhow::anyhow!("{backend} backend is not supported."))
+            };
+        }
         Some("single-chapter") => single_chapter()?,
         Some(_) => return Err(anyhow::anyhow!("Unknown command")),
         _ => book()?,
