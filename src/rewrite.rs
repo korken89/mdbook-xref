@@ -1,25 +1,19 @@
-use core::num;
 use std::{
     collections::{BinaryHeap, HashMap},
     ops::Range,
     path::PathBuf,
 };
 
-use mdbook_preprocessor::book::{BookItem, SectionNumber};
+use mdbook_preprocessor::book::BookItem;
 
 #[derive(Clone, Debug, Default)]
 pub struct Rewrites {
-    new_numberings: HashMap<PathBuf, SectionNumber>,
     inner: HashMap<PathBuf, BinaryHeap<Rewrite>>,
 }
 
 impl Rewrites {
     pub fn at(&mut self, path: PathBuf) -> &mut BinaryHeap<Rewrite> {
         self.inner.entry(path).or_default()
-    }
-
-    pub fn set_numbering(&mut self, path: PathBuf, numbering: SectionNumber) {
-        self.new_numberings.insert(path, numbering);
     }
 
     pub fn apply(mut self, items: &mut [BookItem]) {
@@ -36,10 +30,6 @@ impl Rewrites {
             let Some(path) = &chapter.path else {
                 continue;
             };
-
-            if let Some(new_numbering) = self.new_numberings.remove(path) {
-                chapter.number = Some(new_numbering);
-            }
 
             if let Some(rewrites) = self.inner.remove(path) {
                 let content = &chapter.content;

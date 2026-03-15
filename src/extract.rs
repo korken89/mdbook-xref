@@ -2,9 +2,7 @@ use std::{ops::Range, path::PathBuf};
 
 use indexmap::IndexMap;
 use mdbook_preprocessor::book::{BookItem, Chapter};
-use pulldown_cmark::{
-    CowStr, Event, HeadingLevel, LinkType, Parser, Tag, TagEnd, TextMergeWithOffset,
-};
+use pulldown_cmark::{CowStr, Event, LinkType, Parser, Tag, TagEnd, TextMergeWithOffset};
 
 #[derive(Debug, Clone)]
 pub struct Url<'a>(CowStr<'a>);
@@ -55,21 +53,8 @@ impl<'a> Link<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Heading<'a> {
-    pub level: usize,
-    pub source: Option<(HeadingLevel, Range<usize>)>,
-    pub text: &'a str,
-}
-
-#[derive(Debug, Clone)]
 pub enum Element<'a> {
     CodeBlock(CodeBlock<'a>),
-    AutolinkedHeading {
-        heading: Heading<'a>,
-        link_range: Range<usize>,
-        link_url: Url<'a>,
-    },
-    Heading(Heading<'a>),
     Link(Link<'a>),
 }
 
@@ -91,20 +76,15 @@ pub fn extract_elements_recursively<'a>(
             continue;
         };
 
-        let mut items = vec![Element::Heading(Heading {
-            level: chapter.number.as_ref().unwrap().len(),
-            text: &chapter.name,
-            source: None,
-        })];
-
-        extract_elements(&chapter, &mut items);
+        let items = extract_elements(&chapter);
         map.insert(path, items);
 
         extract_elements_recursively(&chapter.sub_items, map);
     }
 }
 
-fn extract_elements<'a>(chapter: &'a Chapter, elements: &mut Vec<Element<'a>>) {
+fn extract_elements(chapter: &Chapter) -> Vec<Element<'_>> {
+    let mut elements = Vec::new();
     let content = &chapter.content;
     let parser = Parser::new(&content).into_offset_iter();
     let mut parser = TextMergeWithOffset::new(parser);
@@ -128,73 +108,6 @@ fn extract_elements<'a>(chapter: &'a Chapter, elements: &mut Vec<Element<'a>>) {
                     parser.next(),
                     Some((Event::End(TagEnd::CodeBlock), _))
                 ));
-            }
-            Event::Start(Tag::Heading { level, .. }) => {
-                let mut text_start = None;
-
-                let mut last_link_start = None;
-                let auto_link_label = loop {
-                    let Some((next, next_range)) = parser.next() else {
-                        break None;
-                    };
-
-                    if text_start.is_none() {
-                        text_start = Some(next_range.start);
-                    }
-
-                    match next {
-                        Event::Start(Tag::Link {
-                            link_type: LinkType::Autolink,
-                            dest_url,
-                            ..
-                        }) => {
-                            last_link_start = Some((dest_url, next_range));
-                        }
-                        Event::End(TagEnd::Link) => {
-                            let last_link_start = last_link_start.take();
-                            if parser.next().is_some_and(|(event, _)| {
-                                event == Event::End(TagEnd::Heading(level))
-                            }) {
-                                break last_link_start;
-                            }
-                        }
-                        Event::End(TagEnd::Heading(_)) => break None,
-                        _ => {
-                            continue;
-                        }
-                    }
-                };
-
-                if let Some((dest_url, link_range)) = auto_link_label {
-                    let heading_no_link_range = range.start..link_range.start;
-                    let text_data = text_start.unwrap()..link_range.start;
-
-                    let Some(dest_url) = Url::new(dest_url) else {
-                        continue;
-                    };
-
-                    let heading = Heading {
-                        level: chapter.number.as_ref().unwrap().len() + level as usize,
-                        text: &content[text_data],
-                        source: Some((level, heading_no_link_range)),
-                    };
-
-                    elements.push(Element::AutolinkedHeading {
-                        heading,
-                        link_range,
-                        link_url: dest_url,
-                    });
-                } else {
-                    let text_data = text_start.unwrap()..range.end;
-
-                    let heading = Heading {
-                        level: chapter.number.as_ref().unwrap().len() + level as usize,
-                        text: &content[text_data],
-                        source: Some((level, range)),
-                    };
-
-                    elements.push(Element::Heading(heading));
-                }
             }
             Event::Start(Tag::Link {
                 link_type,
@@ -224,4 +137,6 @@ fn extract_elements<'a>(chapter: &'a Chapter, elements: &mut Vec<Element<'a>>) {
             _ => {}
         }
     }
+
+    elements
 }

@@ -165,7 +165,6 @@ impl Rewriter {
                             replacement,
                         }
                     }
-                    _ => continue,
                 };
 
                 rewrites.push(rewrite);
