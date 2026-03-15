@@ -22,13 +22,6 @@ impl<'a> Url<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct CodeBlock<'a> {
-    pub info: CowStr<'a>,
-    pub contents: CowStr<'a>,
-    pub full_range: Range<usize>,
-}
-
-#[derive(Debug, Clone)]
 pub struct Link<'a> {
     pub url: Url<'a>,
     pub full_range: Range<usize>,
@@ -52,19 +45,13 @@ impl<'a> Link<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Element<'a> {
-    CodeBlock(CodeBlock<'a>),
-    Link(Link<'a>),
-}
-
 /// Extract elements recursively.
 ///
 /// `map` will contain the paths to included
 /// chapthers in summary order.
 pub fn extract_elements_recursively<'a>(
     items: &'a Vec<BookItem>,
-    map: &mut IndexMap<PathBuf, Vec<Element<'a>>>,
+    map: &mut IndexMap<PathBuf, Vec<Link<'a>>>,
 ) {
     let chapters = items.iter().filter_map(|i| match i {
         BookItem::Chapter(c) => Some(c),
@@ -83,7 +70,7 @@ pub fn extract_elements_recursively<'a>(
     }
 }
 
-fn extract_elements(chapter: &Chapter) -> Vec<Element<'_>> {
+fn extract_elements(chapter: &Chapter) -> Vec<Link<'_>> {
     let mut elements = Vec::new();
     let content = &chapter.content;
     let parser = Parser::new(&content).into_offset_iter();
@@ -91,24 +78,6 @@ fn extract_elements(chapter: &Chapter) -> Vec<Element<'_>> {
 
     while let Some((event, range)) = parser.next() {
         match event {
-            Event::Start(Tag::CodeBlock(pulldown_cmark::CodeBlockKind::Fenced(info))) => {
-                let text = if let Some((Event::Text(text), _)) = parser.next() {
-                    text
-                } else {
-                    CowStr::Borrowed("")
-                };
-
-                elements.push(Element::CodeBlock(CodeBlock {
-                    info,
-                    contents: text,
-                    full_range: range,
-                }));
-
-                assert!(matches!(
-                    parser.next(),
-                    Some((Event::End(TagEnd::CodeBlock), _))
-                ));
-            }
             Event::Start(Tag::Link {
                 link_type,
                 dest_url,
@@ -132,7 +101,7 @@ fn extract_elements(chapter: &Chapter) -> Vec<Element<'_>> {
                     }
                 }
 
-                elements.push(Element::Link(Link::new(dest_url, range, title, text)))
+                elements.push(Link::new(dest_url, range, title, text));
             }
             _ => {}
         }
