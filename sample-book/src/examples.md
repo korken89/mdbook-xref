@@ -17,6 +17,14 @@ Wah wah weeh weeh
 
 [its-name]: ref:buh "title"
 
-We also have [cross-referenceable markdown, rendered `in-place`](label:text) that we can [refer back to](ref:text)
+We also have [cross-referenceable markdown, rendered `in-place`](label:text "some text") that we can [refer back to](ref:text)
 
-<ref:text>
+As mentioned in <ref:text>
+
+<div id="testy">
+    This is the div with text.
+</div>
+
+[](label:testy "a custom HTML element")
+
+As mentioned in <ref:testy>

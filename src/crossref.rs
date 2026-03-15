@@ -20,6 +20,7 @@ use crate::{
 enum Supplement {
     Section(SectionNumber),
     Figure(usize),
+    Custom(String),
 }
 
 impl std::fmt::Display for Supplement {
@@ -41,6 +42,7 @@ impl std::fmt::Display for Supplement {
                 Ok(())
             }
             Supplement::Figure(_) => todo!(),
+            Supplement::Custom(v) => f.write_str(v),
         }
     }
 }
@@ -83,10 +85,11 @@ impl Rewriter {
         map: &IndexMap<PathBuf, Vec<Element>>,
         rewrites: &mut Rewrites,
     ) -> Result<()> {
-        let mut known_links = HashMap::new();
+        let mut known_crossrefs = HashMap::new();
 
         let mut section_numbering = Numbering::default();
 
+        // Find all cross references
         for (md_path, elements) in map {
             let mut new_numbering = None;
 
@@ -111,7 +114,7 @@ impl Rewriter {
                         let numbering = section_numbering.next(*level);
                         let supplement = Supplement::Section(numbering.clone());
 
-                        known_links.insert(
+                        known_crossrefs.insert(
                             label_name,
                             Crossref {
                                 path: md_path.as_ref(),
@@ -158,29 +161,29 @@ impl Rewriter {
                         }
                     }
                     Element::Link(link) => {
-                        if link.url.protocol() != "label" || link.text.is_empty() {
+                        if link.url.protocol() != "label" {
                             continue;
                         }
 
                         let id = link.url.value();
 
-                        known_links.insert(
+                        let supplement = if !link.title.is_empty() {
+                            Some(Supplement::Custom(link.title.to_string()))
+                        } else {
+                            None
+                        };
+
+                        known_crossrefs.insert(
                             id,
                             Crossref {
                                 path: md_path.as_ref(),
                                 anchor: id,
-                                supplement: None,
+                                supplement,
                             },
                         );
 
-                        let title = if !link.title.is_empty() {
-                            format!(r#"title="{title}""#, title = link.title)
-                        } else {
-                            "".to_string()
-                        };
-
                         // Render in-place
-                        let mut replacement = format!(r#"<span id="{id}" {title}>"#);
+                        let mut replacement = format!(r#"<span id="{id}">"#);
                         pulldown_cmark::html::write_html_fmt(
                             &mut replacement,
                             link.text.iter().cloned(),
@@ -202,6 +205,7 @@ impl Rewriter {
             }
         }
 
+        // Rewrite all links
         for (md_path, elements) in map {
             let rewrites = rewrites.at(md_path.clone());
             for element in elements {
@@ -211,7 +215,7 @@ impl Rewriter {
                             continue;
                         }
 
-                        let Some(crossref) = known_links.get(link.url.value()) else {
+                        let Some(crossref) = known_crossrefs.get(link.url.value()) else {
                             eprintln!("Unknown reference `{}`", link.url.value());
                             continue;
                         };
@@ -223,7 +227,7 @@ impl Rewriter {
                                 supp.to_string().into_boxed_str(),
                             ))]
                         } else {
-                            eprintln!("Link had neither supplement nor text");
+                            eprintln!("Cross-reference had neither supplement nor text");
                             continue;
                         };
 
