@@ -1,4 +1,2 @@
-- [Examples](./examples.md)
-  <!-- - [Second adjacent](./nested/second_adjacent.md)
-  - [Adjacent](./nested/adjacent.md)
-- [Second Chapter](./second_chapter.md) -->
+- [Creating links](./creating_links.md)
+- [Cross page links](./cross_page.md)
