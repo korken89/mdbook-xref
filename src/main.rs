@@ -77,7 +77,7 @@ fn book() -> Result<String> {
 }
 
 fn extract_rest<'a>(prefix: &str, info: &'a str) -> Option<&'a str> {
-    let stripped_prefix = prefix.strip_prefix(prefix)?;
+    let stripped_prefix = info.strip_prefix(prefix)?;
     if stripped_prefix.is_empty()
         || stripped_prefix
             .chars()
