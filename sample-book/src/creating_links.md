@@ -30,7 +30,8 @@ Non-text items can also be cross-referenced as follows:
 [](label:non-text "Table 1")
 ```
 
-The trick here is that cross-references to `non-text` will create a link to the created table.
+Labels without any text are not rendered at all, and cross-references to `non-text`
+will create a link to the element with ID of the label, which in this case is `non-text`.
 
 In general, you should not create cross-referenceable items like this. Instead, you should let
 other preprocessors generated them, and run the crossref preprocessor after them.

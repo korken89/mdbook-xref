@@ -65,13 +65,18 @@ impl Rewriter {
                         );
 
                         // Render in-place
-                        let mut replacement = format!(r#"<span id="{id}">"#);
-                        pulldown_cmark::html::write_html_fmt(
-                            &mut replacement,
-                            link.text.iter().cloned(),
-                        )
-                        .context("failed to render labeled text")?;
-                        replacement.push_str("</span>");
+                        let replacement = if !link.text.is_empty() {
+                            let mut replacement = format!(r#"<span id="{id}">"#);
+                            pulldown_cmark::html::write_html_fmt(
+                                &mut replacement,
+                                link.text.iter().cloned(),
+                            )
+                            .context("failed to render labeled text")?;
+                            replacement.push_str("</span>");
+                            replacement
+                        } else {
+                            "".to_string()
+                        };
 
                         rewrites_path.push(Rewrite {
                             range: link.full_range.clone(),
