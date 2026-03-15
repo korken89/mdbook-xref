@@ -10,7 +10,8 @@ use mdbook_preprocessor::book::SectionNumber;
 use anyhow::Result;
 
 use crate::{
-    Element, Heading, Rewriter,
+    Element, Rewriter,
+    extract::Heading,
     rewrite::{Rewrite, Rewrites},
 };
 
@@ -44,13 +45,13 @@ impl std::fmt::Display for Supplement {
 }
 
 #[derive(Debug, Clone)]
-struct Link<'a> {
+struct Crossref<'a> {
     path: &'a Path,
     anchor: &'a str,
     supplement: Supplement,
 }
 
-impl Link<'_> {
+impl Crossref<'_> {
     pub fn url(&self) -> String {
         format!(
             "/{path}#{anchor}",
@@ -98,19 +99,20 @@ impl Rewriter {
                                 source,
                                 text,
                             },
-                        link,
+                        link_range,
+                        link_url,
                     } => {
-                        if link.protocol() != "label" {
+                        if link_url.protocol() != "label" {
                             continue;
                         }
 
-                        let label_name = link.value();
+                        let label_name = link_url.value();
                         let numbering = section_numbering.next(*level);
                         let supplement = Supplement::Section(numbering.clone());
 
                         known_links.insert(
                             label_name,
-                            Link {
+                            Crossref {
                                 path: md_path.as_ref(),
                                 anchor: label_name,
                                 supplement: supplement.clone(),
@@ -119,7 +121,7 @@ impl Rewriter {
 
                         // Replace with mdbook-native ID format
                         rewrites_path.push(Rewrite {
-                            range: link.full_range.clone(),
+                            range: link_range.clone(),
                             replacement: format!("{{ #{label_name} }}"),
                         });
 
@@ -167,13 +169,13 @@ impl Rewriter {
             let rewrites = rewrites.at(md_path.clone());
             for element in elements {
                 let rewrite = match element {
-                    Element::Autolink(autolink) => {
-                        if autolink.protocol() != "ref" {
+                    Element::Link(autolink) => {
+                        if autolink.url.protocol() != "ref" {
                             continue;
                         }
 
-                        let Some(link) = known_links.get(autolink.value()) else {
-                            eprintln!("Unknown reference `{}`", autolink.value());
+                        let Some(link) = known_links.get(autolink.url.value()) else {
+                            eprintln!("Unknown reference `{}`", autolink.url.value());
                             continue;
                         };
 
