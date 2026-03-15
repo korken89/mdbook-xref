@@ -80,16 +80,14 @@ impl Numbering {
 }
 
 impl Rewriter {
-    pub fn create_crossref_rewrites(
+    fn scan_crossrefs<'a>(
         &self,
-        map: &IndexMap<PathBuf, Vec<Element>>,
+        map: &'a IndexMap<PathBuf, Vec<Element>>,
         rewrites: &mut Rewrites,
-    ) -> Result<()> {
+    ) -> Result<HashMap<&'a str, Crossref<'a>>> {
+        let mut section_numbering = Numbering::default();
         let mut known_crossrefs = HashMap::new();
 
-        let mut section_numbering = Numbering::default();
-
-        // Find all cross references
         for (md_path, elements) in map {
             let mut new_numbering = None;
 
@@ -188,7 +186,7 @@ impl Rewriter {
                             &mut replacement,
                             link.text.iter().cloned(),
                         )
-                        .context("failed to render labelled text")?;
+                        .context("failed to render labeled text")?;
                         replacement.push_str("</span>");
 
                         rewrites_path.push(Rewrite {
@@ -204,6 +202,16 @@ impl Rewriter {
                 rewrites.set_numbering(md_path.to_path_buf(), new_numbering);
             }
         }
+
+        Ok(known_crossrefs)
+    }
+
+    pub fn create_crossref_rewrites(
+        &self,
+        map: &IndexMap<PathBuf, Vec<Element>>,
+        rewrites: &mut Rewrites,
+    ) -> Result<()> {
+        let known_crossrefs = self.scan_crossrefs(map, rewrites)?;
 
         // Rewrite all links
         for (md_path, elements) in map {
