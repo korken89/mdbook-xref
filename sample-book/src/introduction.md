@@ -1,4 +1,5 @@
-# The `mdbook-crossref` preprocessor
+# The `mdbook-crossref` preprocessor { #creating_links }
+[](label:creating_links "creating links")
 
 This preprocessor allow you to create cross-referenceable labels by creating new link items
 that use the `label` protocol. Additionally, it lets you set the supplement (the text substituted
@@ -6,6 +7,8 @@ at the place of reference) for these links, which is used unless the reference s
 explicitly.
 
 The created labels can then be referred to using links with the `ref` protocol.
+
+For a quickstart guide, see <ref:quickstart>.
 
 ## Creating cross-referenceable labels
 

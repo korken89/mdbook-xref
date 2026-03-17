@@ -1,5 +1,4 @@
 [book]
-authors = ["Example Author"]
 
 [build]
 extra-watch-dirs = ["../src/"]

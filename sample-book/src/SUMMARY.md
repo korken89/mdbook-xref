@@ -1,2 +1,3 @@
-- [Creating links](./creating_links.md)
+- [Introduction](./introduction.md)
+- [Quick Start](./quickstart.md)
 - [Cross page links](./cross_page.md)
