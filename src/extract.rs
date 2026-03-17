@@ -26,7 +26,7 @@ pub struct Link<'a> {
     pub url: Url<'a>,
     pub full_range: Range<usize>,
     pub title: CowStr<'a>,
-    pub text: Vec<Event<'a>>,
+    pub text: Option<&'a str>,
 }
 
 impl<'a> Link<'a> {
@@ -34,7 +34,7 @@ impl<'a> Link<'a> {
         url: Url<'a>,
         full_range: Range<usize>,
         title: CowStr<'a>,
-        text: Vec<Event<'a>>,
+        text: Option<&'a str>,
     ) -> Self {
         Self {
             url,
@@ -87,18 +87,26 @@ fn extract_elements(chapter: &Chapter) -> Vec<Link<'_>> {
                     continue;
                 };
 
-                let mut text = Vec::new();
-                if link_type != LinkType::Autolink {
+                let text = if link_type != LinkType::Autolink {
+                    let (mut current, mut current_range) = parser.next().unwrap();
+                    let start = current_range.start;
+                    let mut end = current_range.end;
                     loop {
-                        let (next, _) = parser.next().unwrap();
-
-                        if next == Event::End(TagEnd::Link) {
+                        if current == Event::End(TagEnd::Link) {
                             break;
                         } else {
-                            text.push(next);
+                            end = current_range.end;
                         }
+
+                        let (next, range) = parser.next().unwrap();
+                        current = next;
+                        current_range = range;
                     }
-                }
+
+                    Some(&content[start..end])
+                } else {
+                    None
+                };
 
                 elements.push(Link::new(dest_url, range, title, text));
             }

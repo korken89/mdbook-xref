@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result};
-use pulldown_cmark::{CowStr, Event, Tag, TagEnd};
 
 use crate::{CrossrefPreprocessor, rewrite::Rewrite};
 
@@ -39,13 +38,11 @@ impl CrossrefPreprocessor<'_> {
                 );
 
                 // Render in-place
-                let replacement = if !link.text.is_empty() {
+                let replacement = if let Some(text) = link.text {
                     let mut replacement = format!(r#"<span id="{id}">"#);
-                    pulldown_cmark::html::write_html_fmt(
-                        &mut replacement,
-                        link.text.iter().cloned(),
-                    )
-                    .context("failed to render labeled text")?;
+                    let output = pulldown_cmark::Parser::new(text);
+                    pulldown_cmark::html::write_html_fmt(&mut replacement, output)
+                        .context("failed to render labeled text")?;
                     replacement.push_str("</span>");
                     replacement
                 } else {
@@ -81,36 +78,20 @@ impl CrossrefPreprocessor<'_> {
                     continue;
                 };
 
-                let text = if !link.text.is_empty() {
-                    link.text.clone()
+                let supplement = if let Some(text) = link.text {
+                    text
                 } else if let Some(supp) = &crossref.supplement {
-                    vec![Event::Text(CowStr::Boxed(
-                        supp.to_string().into_boxed_str(),
-                    ))]
+                    supp.as_ref()
                 } else {
                     eprintln!("Cross-reference had neither supplement nor text");
                     continue;
                 };
 
-                let link_start = Event::Start(Tag::Link {
-                    link_type: pulldown_cmark::LinkType::Inline,
-                    dest_url: crossref.url.clone().into(),
-                    title: link.title.clone(),
-                    id: CowStr::Borrowed(""),
-                });
-
-                let events = Some(link_start)
-                    .into_iter()
-                    .chain(text)
-                    .chain(Some(Event::End(TagEnd::Link)));
-
-                let mut link_resolved = String::new();
-                pulldown_cmark_to_cmark::cmark(events, &mut link_resolved)
-                    .context("failed to format cross-reference")?;
+                let replacement = format!("[{supplement}]({url})", url = crossref.url);
 
                 let rewrite = Rewrite {
                     range: link.full_range.clone(),
-                    replacement: link_resolved,
+                    replacement,
                 };
 
                 rewrites.push(rewrite);
