@@ -11,6 +11,32 @@ pub struct Rewrites {
     inner: HashMap<PathBuf, BinaryHeap<Rewrite>>,
 }
 
+#[derive(Debug, Clone)]
+pub struct Rewrite {
+    pub range: Range<usize>,
+    pub replacement: String,
+}
+
+impl PartialEq for Rewrite {
+    fn eq(&self, other: &Self) -> bool {
+        self.range.start == other.range.start
+    }
+}
+
+impl Eq for Rewrite {}
+
+impl PartialOrd for Rewrite {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(Ord::cmp(self, other))
+    }
+}
+
+impl Ord for Rewrite {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.range.start.cmp(&other.range.start)
+    }
+}
+
 impl Rewrites {
     pub fn at(&mut self, path: PathBuf) -> &mut BinaryHeap<Rewrite> {
         self.inner.entry(path).or_default()
@@ -53,31 +79,5 @@ impl Rewrites {
 
             self.apply_mut(&mut chapter.sub_items);
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Rewrite {
-    pub range: Range<usize>,
-    pub replacement: String,
-}
-
-impl PartialEq for Rewrite {
-    fn eq(&self, other: &Self) -> bool {
-        self.range.start == other.range.start
-    }
-}
-
-impl Eq for Rewrite {}
-
-impl PartialOrd for Rewrite {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(Ord::cmp(self, other))
-    }
-}
-
-impl Ord for Rewrite {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.range.start.cmp(&other.range.start)
     }
 }
