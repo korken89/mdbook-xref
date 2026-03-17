@@ -1,11 +1,11 @@
 [package]
-name = "mdbook-crossref"
+name = "mdbook-figure"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
-indexmap = "2.13.0"
 mdbook-preprocessor.workspace = true
 pulldown-cmark.workspace = true
+pulldown-cmark-to-cmark.workspace = true
 serde_json.workspace = true
