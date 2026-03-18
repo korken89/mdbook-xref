@@ -14,7 +14,9 @@ Use cross-references with definition-site defined supplements and automatic link
 
 Define automatically numbered figures of arbitrary types that can be linked to with cross-references.
 
-For full documentation, browse the book in `docs` with `mdbook` (i.e. `mdbook serve docs`).
+# Documentation
+
+For full documentation, browse the book `docs` over on [github pages](https://datdenkikniet.github.io/mdbook-crossref/), or by cloning the repo and serving it locally: `mdbook serve docs`.
 
 # License
 
