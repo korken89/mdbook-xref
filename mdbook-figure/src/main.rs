@@ -1,5 +1,6 @@
-use std::fmt::Write as _;
 use std::io::Write;
+use std::ops::Range;
+use std::{collections::HashMap, fmt::Write as _};
 
 use anyhow::{Context, Result};
 use mdbook_preprocessor::book::BookItem;
@@ -31,13 +32,21 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+struct Figure<'a> {
+    input_range: Range<usize>,
+    replacement_text: &'a str,
+    label: String,
+    ty: String,
+    counter: usize,
+}
+
 fn book() -> Result<String> {
     let (_ctx, mut book) = mdbook_preprocessor::parse_input(std::io::stdin())?;
-    number_figures(&mut book.items, &mut 0)?;
+    number_figures(&mut book.items, &mut Default::default())?;
     Ok(serde_json::to_string(&book)?)
 }
 
-fn number_figures(items: &mut [BookItem], counter: &mut usize) -> Result<()> {
+fn number_figures(items: &mut [BookItem], counters: &mut HashMap<String, usize>) -> Result<()> {
     let chapters = items.iter_mut().filter_map(|i| {
         if let BookItem::Chapter(c) = i {
             Some(c)
@@ -56,9 +65,24 @@ fn number_figures(items: &mut [BookItem], counter: &mut usize) -> Result<()> {
                 continue;
             };
 
-            if info.as_ref() != "figure" {
+            let data: Vec<_> = info.split(' ').collect();
+
+            let Some((maybe_figure, data)) = data.split_first() else {
+                continue;
+            };
+
+            if maybe_figure != &"figure" {
                 continue;
             }
+
+            let Some((label, data)) = data.split_first() else {
+                anyhow::bail!(
+                    "Encountered figure without label in chapter {name}!",
+                    name = chapter.name
+                );
+            };
+
+            let ty = data.get(0).unwrap_or(&"Figure");
 
             let (mut current, mut current_range) = parser.next().unwrap();
             let start = current_range.start;
@@ -75,40 +99,52 @@ fn number_figures(items: &mut [BookItem], counter: &mut usize) -> Result<()> {
                 current_range = range;
             }
 
-            rewrites.push((range, &content[start..end], *counter));
+            let counter = counters.entry(ty.to_string()).or_default();
+
+            let figure = Figure {
+                input_range: range,
+                replacement_text: &content[start..end],
+                label: label.to_string(),
+                ty: ty.to_string(),
+                counter: *counter,
+            };
+
+            rewrites.push(figure);
             *counter += 1;
         }
 
         let output = &mut chapter.content;
         let mut last_copied = 0;
-        for (replace_range, replacement_text, counter) in rewrites {
-            let counter = counter + 1;
-            if replace_range.start != last_copied {
-                output.push_str(&content[last_copied..replace_range.start]);
+        for figure in rewrites {
+            let counter = figure.counter + 1;
+            if figure.input_range.start != last_copied {
+                output.push_str(&content[last_copied..figure.input_range.start]);
             }
-
-            let id = format!("figure-{counter}");
 
             #[rustfmt::skip]
             writeln!(
                 output,
-r#"<div id="{id}"></div>
+r#"<div class="figure" id="{label}">
 
 {replacement_text}
 
-<p class="figure-footer">Figure {counter}</p>
+<p class="figure-footer">{ty} {counter}</p>
+</div>
 
-[](label:{id} "Figure {counter}")
-"#
+[](label:{label} "{ty} {counter}")
+"#,
+                label = figure.label,
+                replacement_text = figure.replacement_text,
+                ty = figure.ty,
             )
             .context("writing output")?;
 
-            last_copied = replace_range.end;
+            last_copied = figure.input_range.end;
         }
 
         output.push_str(&content[last_copied..]);
 
-        number_figures(&mut chapter.sub_items, counter)?;
+        number_figures(&mut chapter.sub_items, counters)?;
     }
 
     Ok(())

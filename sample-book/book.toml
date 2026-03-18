@@ -1,10 +1,14 @@
 [book]
 
 [build]
-extra-watch-dirs = ["../mdbook-crossref/src/"]
+extra-watch-dirs = ["../mdbook-crossref/src/", "../mdbook-figure/src/"]
 
 [preprocessor.crossref]
 command = "cargo run -p mdbook-crossref"
+
+[preprocessor.figure]
+before = ["crossref"]
+command = "cargo run -p mdbook-figure"
 
 [output.html]
 additional-css = ["style.css"]
