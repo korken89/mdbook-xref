@@ -8,7 +8,27 @@ explicitly.
 
 The created labels can then be referred to using links with the `ref` protocol.
 
-For a quickstart guide, see <ref:quickstart>.
+## Quick Start
+
+To get started, install the preprocessor:
+
+```sh
+cargo install mdbook-crossref
+```
+
+and add it to your `book.toml`:
+
+```toml
+[book]
+
+[preprocessor.crossref] # This is all you need to do
+```
+
+and start creating `label`s and `ref`erences.
+
+That's all there is to it! To find out how to actually use the preprocessor in more
+detail, see <ref:creating_links>.
+
 
 ## Creating cross-referenceable labels
 

@@ -66,7 +66,7 @@ fn number_figures(items: &mut [BookItem], counters: &mut HashMap<String, usize>)
                 continue;
             };
 
-            let data: Vec<_> = info.split(' ').collect();
+            let data: Vec<_> = info.splitn(3, ' ').collect();
 
             let Some((maybe_figure, data)) = data.split_first() else {
                 continue;
