@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use indexmap::IndexMap;
 use mdbook_preprocessor::book::{Book, BookItem, Chapter};
 use pulldown_cmark::{CowStr, Event, LinkType, Parser, Tag, TagEnd};
 use std::{collections::HashMap, ops::Range, path::PathBuf};
@@ -14,113 +13,22 @@ struct Crossref {
     supplement: Option<String>,
 }
 
-pub struct CrossrefPreprocessor<'a> {
-    rewrites: Rewrites,
-    map: IndexMap<PathBuf, Vec<Link<'a>>>,
-}
+type LinkMap<'a> = HashMap<PathBuf, Vec<Link<'a>>>;
 
-impl CrossrefPreprocessor<'_> {
+#[derive(Default)]
+pub struct CrossrefPreprocessor;
+
+impl CrossrefPreprocessor {
     pub fn rewrite_book(book: &mut Book) -> Result<()> {
-        let mut map = IndexMap::new();
+        let mut map = Default::default();
+        let mut rewrites = Default::default();
+
         extract_links(&book.items, &mut map);
 
-        let mut me = CrossrefPreprocessor {
-            rewrites: Default::default(),
-            map,
-        };
+        let crossrefs = rewrite_and_scan_labels(&mut rewrites, &mut map)?;
+        rewrite_refs(&mut rewrites, &map, &crossrefs)?;
 
-        let crossrefs = me.rewrite_and_scan_labels()?;
-        me.rewrite_refs(&crossrefs)?;
-
-        me.rewrites.apply(&mut book.items);
-
-        Ok(())
-    }
-
-    fn rewrite_and_scan_labels(&mut self) -> Result<HashMap<String, Crossref>> {
-        let mut known_crossrefs = HashMap::new();
-
-        for (md_path, links) in &self.map {
-            let rewrites_path = self.rewrites.at(md_path.clone());
-            for link in links {
-                if link.url.protocol() != "label" {
-                    continue;
-                }
-
-                let id = link.url.value();
-
-                let supplement = if !link.title.is_empty() {
-                    Some(link.title.to_string())
-                } else {
-                    None
-                };
-
-                let existing = known_crossrefs.insert(
-                    id.to_string(),
-                    Crossref {
-                        url: format!("/{path}#{anchor}", path = md_path.display(), anchor = id),
-                        supplement,
-                    },
-                );
-
-                if existing.is_some() {
-                    anyhow::bail!("Duplicate label '{id}'");
-                }
-
-                // Render in-place
-                let replacement = if let Some(text) = link.text {
-                    let mut replacement = format!(r#"<span id="{id}">"#);
-                    let output = pulldown_cmark::Parser::new(text);
-                    pulldown_cmark::html::write_html_fmt(&mut replacement, output)
-                        .context("failed to render labeled text")?;
-                    replacement.push_str("</span>");
-                    replacement
-                } else {
-                    "".to_string()
-                };
-
-                rewrites_path.push(Rewrite {
-                    range: link.full_range.clone(),
-                    replacement,
-                });
-            }
-        }
-
-        Ok(known_crossrefs)
-    }
-
-    fn rewrite_refs(&mut self, crossrefs: &HashMap<String, Crossref>) -> Result<()> {
-        // Rewrite all links
-        for (md_path, links) in &self.map {
-            let rewrites = self.rewrites.at(md_path.clone());
-            for link in links {
-                if link.url.protocol() != "ref" {
-                    continue;
-                }
-
-                let Some(crossref) = crossrefs.get(link.url.value()) else {
-                    anyhow::bail!("Unknown reference `{}`", link.url.value());
-                };
-
-                let supplement = if let Some(text) = link.text {
-                    text
-                } else if let Some(supp) = &crossref.supplement {
-                    supp.as_ref()
-                } else {
-                    eprintln!("Cross-reference had neither supplement nor text");
-                    continue;
-                };
-
-                let replacement = format!("[{supplement}]({url})", url = crossref.url);
-
-                let rewrite = Rewrite {
-                    range: link.full_range.clone(),
-                    replacement,
-                };
-
-                rewrites.push(rewrite);
-            }
-        }
+        rewrites.apply(&mut book.items);
 
         Ok(())
     }
@@ -171,7 +79,7 @@ impl<'a> Link<'a> {
 ///
 /// `map` will contain the paths to included
 /// chapthers in summary order.
-fn extract_links<'a>(items: &'a Vec<BookItem>, map: &mut IndexMap<PathBuf, Vec<Link<'a>>>) {
+fn extract_links<'a>(items: &'a Vec<BookItem>, map: &mut LinkMap<'a>) {
     let chapters = items.iter().filter_map(|i| match i {
         BookItem::Chapter(c) => Some(c),
         _ => None,
@@ -234,4 +142,99 @@ fn extract_links_chapter(chapter: &Chapter) -> Vec<Link<'_>> {
     }
 
     elements
+}
+
+fn rewrite_and_scan_labels(
+    rewrites: &mut Rewrites,
+    map: &LinkMap,
+) -> Result<HashMap<String, Crossref>> {
+    let mut known_crossrefs = HashMap::new();
+
+    for (md_path, links) in map {
+        let rewrites_path = rewrites.at(md_path.clone());
+        for link in links {
+            if link.url.protocol() != "label" {
+                continue;
+            }
+
+            let id = link.url.value();
+
+            let supplement = if !link.title.is_empty() {
+                Some(link.title.to_string())
+            } else {
+                None
+            };
+
+            let existing = known_crossrefs.insert(
+                id.to_string(),
+                Crossref {
+                    url: format!("/{path}#{anchor}", path = md_path.display(), anchor = id),
+                    supplement,
+                },
+            );
+
+            if existing.is_some() {
+                anyhow::bail!("Duplicate label '{id}'");
+            }
+
+            // Render in-place
+            let replacement = if let Some(text) = link.text {
+                let mut replacement = format!(r#"<span id="{id}">"#);
+                let output = pulldown_cmark::Parser::new(text);
+                pulldown_cmark::html::write_html_fmt(&mut replacement, output)
+                    .context("failed to render labeled text")?;
+                replacement.push_str("</span>");
+                replacement
+            } else {
+                "".to_string()
+            };
+
+            rewrites_path.push(Rewrite {
+                range: link.full_range.clone(),
+                replacement,
+            });
+        }
+    }
+
+    Ok(known_crossrefs)
+}
+
+fn rewrite_refs(
+    rewrites: &mut Rewrites,
+    map: &LinkMap,
+    crossrefs: &HashMap<String, Crossref>,
+) -> Result<()> {
+    // Rewrite all links
+    for (md_path, links) in map {
+        let rewrites = rewrites.at(md_path.clone());
+        for link in links {
+            if link.url.protocol() != "ref" {
+                continue;
+            }
+
+            let Some(crossref) = crossrefs.get(link.url.value()) else {
+                anyhow::bail!("Unknown reference `{}`", link.url.value());
+            };
+
+            let supplement = if let Some(text) = link.text {
+                text
+            } else if let Some(supp) = &crossref.supplement {
+                supp.as_ref()
+            } else {
+                eprintln!("Cross-reference had neither supplement nor text");
+                continue;
+            };
+
+            let replacement = format!("[{supplement}]({url})", url = crossref.url);
+
+            let rewrite = Rewrite {
+                range: link.full_range.clone(),
+                replacement,
+            };
+
+            rewrites.push(rewrite);
+        }
+    }
+
+    Ok(())
 }

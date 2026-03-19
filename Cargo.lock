@@ -70,7 +70,6 @@ name = "mdbook-crossref"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "indexmap",
  "mdbook-preprocessor",
  "pulldown-cmark",
  "serde_json",
