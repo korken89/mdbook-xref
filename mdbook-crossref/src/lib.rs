@@ -55,13 +55,17 @@ impl CrossrefPreprocessor<'_> {
                     None
                 };
 
-                known_crossrefs.insert(
+                let existing = known_crossrefs.insert(
                     id.to_string(),
                     Crossref {
                         url: format!("/{path}#{anchor}", path = md_path.display(), anchor = id),
                         supplement,
                     },
                 );
+
+                if existing.is_some() {
+                    anyhow::bail!("Duplicate label '{id}'");
+                }
 
                 // Render in-place
                 let replacement = if let Some(text) = link.text {
@@ -95,8 +99,7 @@ impl CrossrefPreprocessor<'_> {
                 }
 
                 let Some(crossref) = crossrefs.get(link.url.value()) else {
-                    eprintln!("Unknown reference `{}`", link.url.value());
-                    continue;
+                    anyhow::bail!("Unknown reference `{}`", link.url.value());
                 };
 
                 let supplement = if let Some(text) = link.text {
