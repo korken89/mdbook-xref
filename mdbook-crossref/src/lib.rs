@@ -7,6 +7,9 @@ mod rewrite;
 
 use crate::rewrite::{Rewrite, Rewrites};
 
+#[cfg(test)]
+mod test;
+
 #[derive(Debug, Clone)]
 struct Crossref {
     url: String,
