@@ -1,5 +1,4 @@
-# The `mdbook-xref` preprocessor { #creating_links }
-[](label:creating_links "creating links")
+# The `mdbook-xref` preprocessor
 
 This preprocessor allow you to create cross-referenceable labels by creating new link items
 that use the `label` protocol. Additionally, it lets you set the supplement (the text substituted
@@ -30,7 +29,8 @@ That's all there is to it! To find out how to actually use the preprocessor in m
 detail, see <ref:creating_links>.
 
 
-## Creating cross-referenceable labels
+## Creating cross-referenceable labels { #creating_links }
+[](label:creating_links "creating links")
 
 A piece of referenceable text (with support for inline markdown) can be created as follows:
 
