@@ -64,12 +64,10 @@ impl Rewrites {
 
                 let mut last_copied = 0;
                 for rewrite in ordered {
-                    if rewrite.range.start != last_copied {
-                        output.push_str(&content[last_copied..rewrite.range.start]);
-                    }
+                    output.push_str(&content[last_copied..rewrite.range.start]);
+                    last_copied = rewrite.range.end;
 
                     output.push_str(&rewrite.replacement);
-                    last_copied = rewrite.range.end;
                 }
 
                 output.push_str(&content[last_copied..]);

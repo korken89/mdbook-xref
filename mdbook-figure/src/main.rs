@@ -57,7 +57,7 @@ fn number_figures(items: &mut [BookItem], counters: &mut HashMap<String, usize>)
     });
 
     for chapter in chapters {
-        let content = core::mem::take(&mut chapter.content);
+        let content = &chapter.content;
         let mut parser = Parser::new(&content).into_offset_iter();
 
         let mut rewrites = Vec::new();
@@ -123,11 +123,6 @@ fn number_figures(items: &mut [BookItem], counters: &mut HashMap<String, usize>)
                 if let Some(Event::Start(Tag::Table(_))) = first {
                     "Table".to_string()
                 } else {
-                    eprintln!(
-                        "Found figure without explicit or auto-detectable type in chapter {name}. Don't know type for event {first:?}",
-                        name = chapter.name
-                    );
-
                     "Figure".to_string()
                 }
             };
@@ -147,13 +142,12 @@ fn number_figures(items: &mut [BookItem], counters: &mut HashMap<String, usize>)
             *counter += 1;
         }
 
-        let output = &mut chapter.content;
+        let mut output = String::new();
         let mut last_copied = 0;
         for figure in rewrites {
             let counter = figure.counter + 1;
-            if figure.input_range.start != last_copied {
-                output.push_str(&content[last_copied..figure.input_range.start]);
-            }
+            output.push_str(&content[last_copied..figure.input_range.start]);
+            last_copied = figure.input_range.end;
 
             let name = format!("{ty} {counter}", ty = figure.ty);
             let description = if let Some(description) = figure.description {
@@ -178,11 +172,11 @@ r#"<div class="figure" id="{label}">
                 replacement_text = figure.replacement_text,
             )
             .context("writing output")?;
-
-            last_copied = figure.input_range.end;
         }
 
         output.push_str(&content[last_copied..]);
+
+        chapter.content = output;
 
         number_figures(&mut chapter.sub_items, counters)?;
     }
