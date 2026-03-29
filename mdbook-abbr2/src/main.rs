@@ -5,7 +5,10 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use mdbook_preprocessor::book::{Book, BookItem, Chapter};
+use mdbook_preprocessor::{
+    PreprocessorContext,
+    book::{Book, BookItem, Chapter},
+};
 use pulldown_cmark::{Event, LinkType, Tag};
 
 fn main() -> Result<()> {
@@ -37,20 +40,7 @@ fn main() -> Result<()> {
 fn book() -> Result<String> {
     let (ctx, mut book) = mdbook_preprocessor::parse_input(std::io::stdin())?;
 
-    let abbreviations: PathBuf = ctx
-        .config
-        .get("preprocessor.abbr2.path")?
-        .context("No abbreviations path configured.")?;
-
-    let abbreviations = ctx.root.join(abbreviations);
-    let data = std::fs::read(&abbreviations).with_context(|| {
-        format!(
-            "Failed to read abbreviations file {}",
-            abbreviations.display()
-        )
-    })?;
-
-    rewrite_book(&data, &mut book)?;
+    rewrite_book(&ctx, &mut book)?;
 
     Ok(serde_json::to_string(&book)?)
 }
@@ -61,12 +51,21 @@ struct Abbreviation {
     pub expanded: String,
 }
 
-fn rewrite_book(abbreviation_data: &[u8], book: &mut Book) -> Result<()> {
-    let mut abbreviations: HashMap<String, String> = HashMap::new();
+fn rewrite_book(ctx: &PreprocessorContext, book: &mut Book) -> Result<()> {
+    let abbr_path: PathBuf = ctx
+        .config
+        .get("preprocessor.abbr2.path")?
+        .context("No abbreviations path configured.")?;
+
+    let abbr_path = ctx.root.join(abbr_path);
+    let data = std::fs::read(&abbr_path)
+        .with_context(|| format!("Failed to read abbreviations file {}", abbr_path.display()))?;
 
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)
-        .from_reader(abbreviation_data);
+        .from_reader(data.as_slice());
+
+    let mut abbreviations: HashMap<String, String> = HashMap::new();
 
     for abbreviation in reader.deserialize() {
         let abbreviation: Abbreviation =
@@ -86,12 +85,25 @@ fn rewrite_book(abbreviation_data: &[u8], book: &mut Book) -> Result<()> {
 
     do_rewrite(&abbreviations, &mut used_abbreviations, &mut book.items)?;
 
-    add_abbr_page(&abbreviations, &mut used_abbreviations, book);
+    if !used_abbreviations.is_empty() {
+        let separator = ctx
+            .config
+            .get("preprocessor.abbr2.separator")?
+            .unwrap_or(true);
+
+        if separator {
+            book.items.push(BookItem::Separator);
+        }
+
+        let chapter = make_abbr_chapter(&abbreviations, &mut used_abbreviations);
+
+        book.items.push(BookItem::Chapter(chapter));
+    }
 
     Ok(())
 }
 
-fn add_abbr_page(abbrs: &HashMap<String, String>, used: &HashSet<String>, book: &mut Book) {
+fn make_abbr_chapter(abbrs: &HashMap<String, String>, used: &HashSet<String>) -> Chapter {
     let mut page = String::new();
 
     for abbr in used {
@@ -113,7 +125,7 @@ fn add_abbr_page(abbrs: &HashMap<String, String>, used: &HashSet<String>, book: 
         parent_names: Default::default(),
     };
 
-    book.items.push(BookItem::Chapter(chapter));
+    chapter
 }
 
 fn do_rewrite(

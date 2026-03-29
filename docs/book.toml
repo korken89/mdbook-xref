@@ -14,6 +14,7 @@ command = "cargo run -p mdbook-figure"
 before = ["xref"]
 command = "cargo run -p mdbook-abbr2"
 path = "abbreviations.csv"
+separator = true
 
 [output.html]
 additional-css = ["style.css"]
