@@ -176,6 +176,11 @@ fn do_rewrite(
                 continue;
             };
 
+            let (abbr, _form) = abbr
+                .rsplit_once(':')
+                .map(|(a, b)| (a, Some(b)))
+                .unwrap_or((abbr, None));
+
             let Some(abbr) = abbrs.get(abbr) else {
                 anyhow::bail!("Unknown abbreviation '{abbr}' used ");
             };
