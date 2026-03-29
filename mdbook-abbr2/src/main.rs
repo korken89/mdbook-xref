@@ -186,9 +186,9 @@ fn do_rewrite(
             };
 
             let text = if used.insert(abbr.abbreviation.clone()) {
-                &abbr.expanded
+                format!("{} ({})", abbr.expanded, abbr.abbreviation)
             } else {
-                &abbr.abbreviation
+                abbr.abbreviation.clone()
             };
 
             let hover = abbr
