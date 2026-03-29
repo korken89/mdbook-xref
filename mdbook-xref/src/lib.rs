@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use mdbook_preprocessor::book::{Book, BookItem, Chapter};
 use pulldown_cmark::{CowStr, Event, LinkType, Parser, Tag, TagEnd};
 use std::{
@@ -208,9 +208,7 @@ fn rewrite_and_scan_labels(
             // Render in-place
             let replacement = if let Some(text) = link.text {
                 let mut replacement = format!(r#"<span id="{id}">"#);
-                let output = pulldown_cmark::Parser::new(text);
-                pulldown_cmark::html::write_html_fmt(&mut replacement, output)
-                    .context("failed to render labeled text")?;
+                replacement.push_str(text);
                 replacement.push_str("</span>");
                 replacement
             } else {
