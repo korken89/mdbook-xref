@@ -6,3 +6,7 @@
 .figure-caption {
     text-align: center;
 }
+
+.abbr {
+    text-decoration: underline dashed;
+}

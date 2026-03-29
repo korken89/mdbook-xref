@@ -49,6 +49,7 @@ fn book() -> Result<String> {
 struct Abbreviation {
     pub abbreviation: String,
     pub expanded: String,
+    pub hover: Option<String>,
 }
 
 fn rewrite_book(ctx: &PreprocessorContext, book: &mut Book) -> Result<()> {
@@ -63,21 +64,38 @@ fn rewrite_book(ctx: &PreprocessorContext, book: &mut Book) -> Result<()> {
 
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)
+        .flexible(true)
         .from_reader(data.as_slice());
 
-    let mut abbreviations: HashMap<String, String> = HashMap::new();
+    let mut abbreviations = HashMap::new();
 
-    for abbreviation in reader.deserialize() {
-        let abbreviation: Abbreviation =
-            abbreviation.context("Failed to deserialize a CSV record")?;
+    for abbreviation in reader.records() {
+        let abbreviation = abbreviation.context("Failed to deserialize a CSV record")?;
+
+        let mut fields = abbreviation.iter();
+
+        let Some(abbreviation) = fields.next() else {
+            anyhow::bail!("Expected 2 or 3 columns per CSV row, got none");
+        };
+
+        let Some(expanded) = fields.next() else {
+            anyhow::bail!("No expanded form defined for '{abbreviation}'");
+        };
+
+        let hover = fields.next().map(|v| v.to_string());
+
         if abbreviations
-            .insert(abbreviation.abbreviation.clone(), abbreviation.expanded)
+            .insert(
+                abbreviation.to_string(),
+                Abbreviation {
+                    abbreviation: abbreviation.to_string(),
+                    expanded: expanded.to_string(),
+                    hover,
+                },
+            )
             .is_some()
         {
-            anyhow::bail!(
-                "Abbreviation '{}' defined more than once",
-                abbreviation.abbreviation
-            );
+            anyhow::bail!("Abbreviation '{abbreviation}' defined more than once");
         }
     }
 
@@ -103,11 +121,11 @@ fn rewrite_book(ctx: &PreprocessorContext, book: &mut Book) -> Result<()> {
     Ok(())
 }
 
-fn make_abbr_chapter(abbrs: &HashMap<String, String>, used: &HashSet<String>) -> Chapter {
+fn make_abbr_chapter(abbrs: &HashMap<String, Abbreviation>, used: &HashSet<String>) -> Chapter {
     let mut page = String::new();
 
     for abbr in used {
-        let expanded = abbrs.get(abbr).unwrap();
+        let expanded = &abbrs.get(abbr).unwrap().expanded;
         let id = format!("abbr-{abbr}");
         let entry = format!(r#"* [**{abbr}**: {expanded}](label:{id} "{abbr}")"#);
 
@@ -129,7 +147,7 @@ fn make_abbr_chapter(abbrs: &HashMap<String, String>, used: &HashSet<String>) ->
 }
 
 fn do_rewrite(
-    abbrs: &HashMap<String, String>,
+    abbrs: &HashMap<String, Abbreviation>,
     used: &mut HashSet<String>,
     items: &mut [BookItem],
 ) -> Result<()> {
@@ -158,15 +176,26 @@ fn do_rewrite(
                 continue;
             };
 
-            let Some(full) = abbrs.get(abbr) else {
+            let Some(abbr) = abbrs.get(abbr) else {
                 anyhow::bail!("Unknown abbreviation '{abbr}' used ");
             };
 
-            let replacement = if used.insert(abbr.to_string()) {
-                format!("[{full}](ref:abbr-{abbr})")
+            let text = if used.insert(abbr.abbreviation.clone()) {
+                &abbr.expanded
             } else {
-                format!("<ref:abbr-{abbr}>")
+                &abbr.abbreviation
             };
+
+            let hover = abbr
+                .hover
+                .as_ref()
+                .unwrap_or_else(|| &abbr.expanded)
+                .replace(r#"""#, r#"\""#);
+            let abbr = &abbr.abbreviation;
+
+            let link = format!(r#"[{text}](ref:abbr-{abbr} "{hover}")"#);
+
+            let replacement = format!(r#"<span class="abbr">{link}</span>"#);
 
             replacements.push((range, replacement));
         }
