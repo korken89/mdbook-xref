@@ -251,8 +251,9 @@ fn rewrite_refs(
                 continue;
             };
 
+            let title = link.title.replace(r#"""#, r#"\""#);
             let replacement = format!(
-                "[{supplement}]({url})",
+                r#"[{supplement}]({url} "{title}")"#,
                 url = crossref.rel_link_from(md_path)
             );
 
