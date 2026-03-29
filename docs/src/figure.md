@@ -20,6 +20,8 @@ and add it to your `book.toml`:
 before = [ "xref" ]
 ```
 
+First use: <abbr:ABR>, second use: <abbr:ABR>.
+
 ## Defining figures
 
 Defining figures is done as follows:

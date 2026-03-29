@@ -1,0 +1,17 @@
+[package]
+name = "mdbook-abbr2"
+version = "0.1.0"
+edition = "2024"
+description = "a preprocessor to add support for abbreviations to mdbook, inspired by the typst package abbr"
+license = "MIT"
+authors = [ "Johannes Cornelis Draaijer <jcdra1@gmail.com>" ]
+documentation = "https://datdenkikniet.github.io/mdbook-xref/"
+repository = "https://github.com/datdenkikniet/mdbook-xref"
+
+[dependencies]
+anyhow.workspace = true
+csv = "1.4.0"
+mdbook-preprocessor.workspace = true
+pulldown-cmark.workspace = true
+serde = { version = "1.0.228", default-features = false }
+serde_json.workspace = true
