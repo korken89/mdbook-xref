@@ -1,6 +1,6 @@
 [package]
 name = "mdbook-abbr2"
-version = "0.1.0-pre"
+version = "0.1.0"
 edition = "2024"
 description = "a preprocessor to add support for abbreviations to mdbook, inspired by the typst package abbr"
 license = "MIT"
