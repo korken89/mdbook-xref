@@ -1,6 +1,6 @@
 [package]
 name = "mdbook-xref"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "a preprocessor to add support for easy cross-references in mdbook"
 license = "MIT"
