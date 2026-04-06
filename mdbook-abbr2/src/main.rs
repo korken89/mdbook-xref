@@ -185,11 +185,7 @@ fn do_rewrite(
                 anyhow::bail!("Unknown abbreviation '{abbr}' used ");
             };
 
-            let text = if used.insert(abbr.abbreviation.clone()) {
-                format!("{} ({})", abbr.expanded, abbr.abbreviation)
-            } else {
-                abbr.abbreviation.clone()
-            };
+            used.insert(abbr.abbreviation.clone());
 
             let hover = abbr
                 .hover
@@ -198,7 +194,7 @@ fn do_rewrite(
                 .replace(r#"""#, r#"\""#);
             let abbr = &abbr.abbreviation;
 
-            let link = format!(r#"[{text}](ref:abbr-{abbr} "{hover}")"#);
+            let link = format!(r#"[{abbr}](ref:abbr-{abbr} "{hover}")"#);
 
             let replacement = format!(r#"<span class="abbr">{link}</span>"#);
 

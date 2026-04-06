@@ -1,3 +1,4 @@
 - [`mdbook-xref`](./crossref.md)
     - [Cross page links](./cross_page.md)
 - [`mdbook-figure`](./figure.md)
+- [`mdbook-abbr2`](./abbr2.md)
