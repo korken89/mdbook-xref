@@ -5,7 +5,7 @@ edition = "2024"
 description = "a preprocessor to add support for easy cross-references in mdbook"
 license = "MIT"
 authors = [ "Johannes Cornelis Draaijer <jcdra1@gmail.com>" ]
-documentation = "https://datdenkikniet.github.io/mdbook-xref/"
+documentation = "https://datdenkikniet.github.io/mdbook-xref/crossref.html"
 repository = "https://github.com/datdenkikniet/mdbook-xref"
 
 [dependencies]

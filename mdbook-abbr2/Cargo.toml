@@ -5,7 +5,7 @@ edition = "2024"
 description = "a preprocessor to add support for abbreviations to mdbook, inspired by the typst package abbr"
 license = "MIT"
 authors = [ "Johannes Cornelis Draaijer <jcdra1@gmail.com>" ]
-documentation = "https://datdenkikniet.github.io/mdbook-xref/"
+documentation = "https://datdenkikniet.github.io/mdbook-xref/abbr2.html"
 repository = "https://github.com/datdenkikniet/mdbook-xref"
 
 [dependencies]
