@@ -124,10 +124,19 @@ fn rewrite_book(ctx: &PreprocessorContext, book: &mut Book) -> Result<()> {
 fn make_abbr_chapter(abbrs: &HashMap<String, Abbreviation>, used: &HashSet<String>) -> Chapter {
     let mut page = String::new();
 
+    let mut used = used.into_iter().collect::<Vec<_>>();
+    used.sort();
+
+    page.push_str(
+        r#"| Abbreviation | Definition |
+| :----------- | :--------- |"#,
+    );
+    page.push('\n');
+
     for abbr in used {
         let expanded = &abbrs.get(abbr).unwrap().expanded;
         let id = format!("abbr-{abbr}");
-        let entry = format!(r#"* [**{abbr}**: {expanded}](label:{id} "{abbr}")"#);
+        let entry = format!(r#"| [**{abbr}**](label:{id} "{abbr}") | {expanded} |"#);
 
         page.push_str(&entry);
         page.push('\n');
